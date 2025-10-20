@@ -1,0 +1,15 @@
+[flake8]
+ignore =
+    # bad variable names like 'l' and 'I'
+    E741,
+    # line break before binary operator
+    W503,
+    # line break after binary operator
+    W504
+
+max-line-length = 80
+
+exclude =
+    ./build,
+    ./dist,
+    ./doc/build
