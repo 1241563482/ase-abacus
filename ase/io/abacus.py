@@ -290,7 +290,7 @@ def read_ase_stru(stru=None, coordinates_type="Cartesian"):
         atoms_sort = []
         atoms_position = []
         atoms_masses = []
-        atoms_magnetism = []
+        atoms_magnetism = stru.info["spin"]
         atoms_fix = []
         atoms_all = stru.get_chemical_symbols()
 
@@ -309,7 +309,7 @@ def read_ase_stru(stru=None, coordinates_type="Cartesian"):
         for atoms_list_name in atoms_list:
             atoms_position.append([])
             atoms_masses.append([])
-            atoms_magnetism.append(0)
+            #atoms_magnetism.append(0)
             atoms_fix.append([])
 
         # get position, masses, magnetism from ase atoms
@@ -439,7 +439,8 @@ def write_input_stru_core(
         for i in range(len(atoms_list)):
             fd.write(atoms_list[i])
             fd.write("\n")
-            fd.write(str("{:0<16.12f}".format(float(atoms_magnetism[i]))))
+            #fd.write(str("{:0<16.12f}".format(float(atoms_magnetism[i]))))
+            fd.write("0.0")
             fd.write("\n")
             fd.write(str(len(atoms_position[i])))
             fd.write("\n")
@@ -457,15 +458,30 @@ def write_input_stru_core(
                 if init_vel:  # velocity in unit A/fs ?
                     sym_pos += f"v {stru.get_velocities()[j][0]} {stru.get_velocities()[j][1]} {stru.get_velocities()[j][2]} "
 
-                if isinstance(stru[k].magmom, float):
-                    sym_pos += f"mag {stru[k].magmom} "
-                elif isinstance(stru[k].magmom, list) or isinstance(
-                    stru[k].magmom, np.ndarray
-                ):
-                    if len(stru[k].magmom) == 3:
-                        sym_pos += f"mag {stru[k].magmom[0]} {stru[k].magmom[1]} {stru[k].magmom[2]} "
-                    elif len(stru[k].magmom) == 1:
-                        sym_pos += f"mag {stru[k].magmom[0]} "
+                #if isinstance(stru[k].magmom, float):
+                #    sym_pos += f"mag {stru[k].magmom} "
+                #elif isinstance(stru[k].magmom, list) or isinstance(
+                #    stru[k].magmom, np.ndarray
+                #):
+                #    if len(stru[k].magmom) == 3:
+                #        sym_pos += f"mag {stru[k].magmom[0]} {stru[k].magmom[1]} {stru[k].magmom[2]} "
+                #    elif len(stru[k].magmom) == 1:
+                #        sym_pos += f"mag {stru[k].magmom[0]} "
+                
+                # Read magmom from atoms.info and the mag style likes:
+                # m sc x y z
+                # m: model of magmom for the k atom
+                # sc: string, dont change
+                # x, y, z: the spin dirction for the k atom
+                
+                spinK = atoms_magnetism[k]
+                magnitude = (spinK[0]**2 + spinK[1]**2 + spinK[2]**2) ** 0.5
+                print(spinK, magnitude)
+                if magnitude <= 0.01:
+                    sym_pos += f"mag 0 sc 0 0 0 "
+                else:
+                    sym_pos += f"mag {magnitude:.4f} sc {spinK[0] / magnitude:.4f} {spinK[1] / magnitude:.4f} {spinK[2] / magnitude:.4f}"
+                
                 k += 1
                 fd.write(sym_pos)
                 fd.write("\n")
@@ -1316,8 +1332,35 @@ class AbacusOutCalcChunk(AbacusOutChunk):
             force_pattern = re.compile(
                 r"TOTAL\-FORCE\s*\(eV/Angstrom\)\s*[\-]{2,}\n([\s\S]+?)\n[\-]{2,}"
             )
-
         return force_pattern.findall(self.contents)
+
+    @cached_property
+    def _magnetic_moments(self):
+        """Parse all the magnetic moments from the output file"""
+        magnetic_moments_pattern = re.compile(
+            r"Total Magnetism\s*\(uB\)\n\n.*\s*atom\s*x\s*y\s*z\n([\s\S]+?)\n\n"
+        )
+        magnetic_moments = magnetic_moments_pattern.findall(self.contents)
+        if not magnetic_moments:
+            magnetic_moments_pattern = re.compile(
+                r"Total Magnetism\s*\(uB\)\s*[\-]{2,}\n([\s\S]+?)\n[\-]{2,}"
+            )
+        print("_magnetic_moments", magnetic_moments)
+        return magnetic_moments_pattern.findall(self.contents)
+
+    @cached_property
+    def _magnetic_forces(self):
+        """Parse all the magnetic moments from the output file"""
+        magnetic_forces_pattern = re.compile(
+            r"Magnetic force\s*\(eV/uB\)\n\n.*\s*atom\s*x\s*y\s*z\n([\s\S]+?)\n\n"
+        )
+        magnetic_forces = magnetic_forces_pattern.findall(self.contents)
+        if not magnetic_forces:
+            magnetic_forces_pattern = re.compile(
+                r"Magnetic force\s*\(eV/uB\)\s*[\-]{2,}\n([\s\S]+?)\n[\-]{2,}"
+            )
+        print("_magnetic_forces", magnetic_forces)
+        return magnetic_forces_pattern.findall(self.contents)
 
     @cached_property
     def _stress(self):
@@ -1525,6 +1568,52 @@ class AbacusOutCalcChunk(AbacusOutChunk):
         except IndexError:
             return
 
+    @cached_property
+    def magnetic_moments(self):
+        """Get magnetic moments from the output file"""
+        def str_to_mag(val_in):
+            data = []
+            val = [v.strip().split() for v in val_in.split("\n")]
+            for v in val:
+                data.append(np.array(v[1:], dtype=float))
+            return np.array(data)
+
+        try:
+            magnetic_moments = self._magnetic_moments[self.index]
+            print("magnetic_moments", magnetic_moments)
+            if Path("ase_sort.dat").exists():
+                atoms_sort = np.loadtxt("ase_sort.dat", dtype=int)
+                print("ase_sort.dat exists", str_to_mag(magnetic_moments)[np.argsort(atoms_sort)])
+                return str_to_mag(magnetic_moments)[np.argsort(atoms_sort)]
+            else:
+                print("ase_sort.dat does not exist", str_to_mag(magnetic_moments))
+                return str_to_mag(magnetic_moments)
+        except IndexError:
+            return
+
+    @cached_property
+    def magnetic_forces(self):
+        """Get magnetic forces from the output file"""
+        def str_to_magforce(val_in):
+            data = []
+            val = [v.strip().split() for v in val_in.split("\n")]
+            for v in val:
+                data.append(np.array(v[1:], dtype=float))
+            return np.array(data)
+
+        try:
+            magnetic_forces = self._magnetic_forces[self.index]
+            print("magnetic_moments", magnetic_forces)
+            if Path("ase_sort.dat").exists():
+                atoms_sort = np.loadtxt("ase_sort.dat", dtype=int)
+                print("ase_sort.dat exists", str_to_magforce(magnetic_forces)[np.argsort(atoms_sort)])
+                return str_to_magforce(magnetic_forces)[np.argsort(atoms_sort)]
+            else:
+                print("ase_sort.dat does not exist", str_to_magforce(magnetic_forces))
+                return str_to_magforce(magnetic_forces)
+        except IndexError:
+            return
+        
     @cached_property
     def stress(self):
         """Get the stress from the output file according to index"""
@@ -1898,6 +1987,8 @@ class AbacusOutCalcChunk(AbacusOutChunk):
             "ibz_kpoints": self.k_points,
             "kpoint_weights": self.k_point_weights,
             "dipole": self.dipole,
+            "magnetic_moments": self.magnetic_moments,
+            "magnetic_forces": self.magnetic_forces,
         }
 
         return {key: value for key, value in results.items() if value is not None}
