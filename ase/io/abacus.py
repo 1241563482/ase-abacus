@@ -476,7 +476,7 @@ def write_input_stru_core(
                 
                 spinK = atoms_magnetism[k]
                 magnitude = (spinK[0]**2 + spinK[1]**2 + spinK[2]**2) ** 0.5
-                print(spinK, magnitude)
+                #print(spinK, magnitude)
                 if magnitude <= 0.01:
                     sym_pos += f"mag 0 sc 0 0 0 "
                 else:
@@ -1345,7 +1345,7 @@ class AbacusOutCalcChunk(AbacusOutChunk):
             magnetic_moments_pattern = re.compile(
                 r"Total Magnetism\s*\(uB\)\s*[\-]{2,}\n([\s\S]+?)\n[\-]{2,}"
             )
-        print("_magnetic_moments", magnetic_moments)
+        #print("_magnetic_moments", magnetic_moments)
         return magnetic_moments_pattern.findall(self.contents)
 
     @cached_property
@@ -1359,7 +1359,7 @@ class AbacusOutCalcChunk(AbacusOutChunk):
             magnetic_forces_pattern = re.compile(
                 r"Magnetic force\s*\(eV/uB\)\s*[\-]{2,}\n([\s\S]+?)\n[\-]{2,}"
             )
-        print("_magnetic_forces", magnetic_forces)
+        #print("_magnetic_forces", magnetic_forces)
         return magnetic_forces_pattern.findall(self.contents)
 
     @cached_property
@@ -1580,13 +1580,13 @@ class AbacusOutCalcChunk(AbacusOutChunk):
 
         try:
             magnetic_moments = self._magnetic_moments[self.index]
-            print("magnetic_moments", magnetic_moments)
+            #print("magnetic_moments", magnetic_moments)
             if Path("ase_sort.dat").exists():
                 atoms_sort = np.loadtxt("ase_sort.dat", dtype=int)
-                print("ase_sort.dat exists", str_to_mag(magnetic_moments)[np.argsort(atoms_sort)])
+                #print("ase_sort.dat exists", str_to_mag(magnetic_moments)[np.argsort(atoms_sort)])
                 return str_to_mag(magnetic_moments)[np.argsort(atoms_sort)]
             else:
-                print("ase_sort.dat does not exist", str_to_mag(magnetic_moments))
+                #print("ase_sort.dat does not exist", str_to_mag(magnetic_moments))
                 return str_to_mag(magnetic_moments)
         except IndexError:
             return
@@ -1603,13 +1603,13 @@ class AbacusOutCalcChunk(AbacusOutChunk):
 
         try:
             magnetic_forces = self._magnetic_forces[self.index]
-            print("magnetic_moments", magnetic_forces)
+            #print("magnetic_moments", magnetic_forces)
             if Path("ase_sort.dat").exists():
                 atoms_sort = np.loadtxt("ase_sort.dat", dtype=int)
-                print("ase_sort.dat exists", str_to_magforce(magnetic_forces)[np.argsort(atoms_sort)])
+                #print("ase_sort.dat exists", str_to_magforce(magnetic_forces)[np.argsort(atoms_sort)])
                 return str_to_magforce(magnetic_forces)[np.argsort(atoms_sort)]
             else:
-                print("ase_sort.dat does not exist", str_to_magforce(magnetic_forces))
+                #print("ase_sort.dat does not exist", str_to_magforce(magnetic_forces))
                 return str_to_magforce(magnetic_forces)
         except IndexError:
             return
