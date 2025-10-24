@@ -477,10 +477,10 @@ def write_input_stru_core(
                 spinK = atoms_magnetism[k]
                 magnitude = (spinK[0]**2 + spinK[1]**2 + spinK[2]**2) ** 0.5
                 #print(spinK, magnitude)
-                if magnitude <= 0.01:
-                    sym_pos += f"mag 0 sc 0 0 0 "
+                if magnitude <= 0.001:
+                    sym_pos += f"mag 0.0 0.0 0.0 sc 1 1 1"
                 else:
-                    sym_pos += f"mag {magnitude:.4f} sc {spinK[0] / magnitude:.4f} {spinK[1] / magnitude:.4f} {spinK[2] / magnitude:.4f}"
+                    sym_pos += f"mag {spinK[0]:.4f} {spinK[1]:.4f} {spinK[2]:.4f} sc 1 1 1"
                 
                 k += 1
                 fd.write(sym_pos)
